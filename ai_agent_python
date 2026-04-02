@@ -1,0 +1,64 @@
+# AI Agent Python Backend for Laravel SaaS
+# FastAPI + Gemini
+
+from fastapi import FastAPI, Request
+from fastapi.responses import Response
+
+app = FastAPI()
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+@app.post("/webhook")
+async def webhook(request: Request):
+    data = await request.form()
+    
+    msg = data.get("Body")
+    print("Incoming:", msg)
+
+    return Response(
+        content=f"""
+        <Response>
+            <Message>You said: {msg}</Message>
+        </Response>
+        """,
+        media_type="application/xml"
+    )
+
+class ChatRequest(BaseModel):
+    messages: List[ChatMessage]
+    stream: Optional[bool] = False
+
+class ChatResponse(BaseModel):
+    message: str
+    done: bool
+
+conversation_history = {}
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest):
+    try:
+        # Build Gemini prompt from messages
+        prompt = ""
+        for msg in request.messages[-10:]:  # Last 10 messages
+            role = "Human" if msg.role == "user" else "Assistant"
+            prompt += f"{role}: {msg.content}\n"
+
+        prompt += "Assistant: "
+
+        # Generate response
+        response = gemini_model.generate_content(prompt)
+        message = response.text.strip()
+
+        return ChatResponse(message=message, done=True)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/health")
+async def health():
+    return {"status": "healthy", "model": "gemini-pro"}
+
+if __name__ == "__main__":
+    port = int(os.getenv("PORT", 8001))
+    uvicorn.run(app, host="0.0.0.0", port=port)
