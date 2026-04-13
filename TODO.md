@@ -1,1 +1,19 @@
-# AI Agent SaaS - Cleanup Complete ✅&#10;&#10;**Status: COMPLETED | All Steps Done**&#10;&#10;## ✅ Phase 1: Extra Files Removed&#10;- [x] 1.1 .env, .env.backup deleted&#10;- [x] 1.2 ai_agent_python/ deleted&#10;- [x] 1.3 twilio-webhook langchain.py & services/langchain_agent.py deleted&#10;- [x] 1.4 Redundant seeders (SampleDataSeeder.php, TestClientSeeder.php) deleted&#10;- [x] 1.5 Example tests deleted&#10;- [x] 1.6 public/index.html, create_test_user.php deleted&#10;&#10;## ✅ Phase 2: Professional Structure&#10;- [x] 2.1 twilio-webhook/ renamed to api/&#10;- [x] 2.2 .env.example exists&#10;&#10;## ✅ Phase 3: Verified&#10;- [x] 3.1 TODO updated&#10;- [x] 3.2 Commands run successfully&#10;- [x] 3.3 Structure professional, no functionality affected&#10;&#10;## 📁 Final Structure&#10;- Laravel backend (clean migrations/seeders)&#10;- React/Vite frontend&#10;- api/ (FastAPI core only, no Langchain bloat)&#10;- Standard Laravel dirs, no extras&#10;&#10;**Project is now professional and clean!** Run `git status` to review changes. To run: `php artisan serve`, `npm run dev`, `cd api & uvicorn main:app --reload`.
+
+
+## [ ] Step 2: Kill old servers
+taskkill /F /IM python.exe
+
+## [ ] Step 3: Restart server
+cd twilio-webhook && venv\\Scripts\\activate && python -m uvicorn main:app --host 0.0.0.0 --port 8003 --reload
+
+## [ ] Step 4: Verify health shows "twilio_sid":true
+
+## [ ] Step 5: Test simulation POST returns empty TwiML + WhatsApp sent log
+
+## [ ] Step 6: Get ngrok URL from http://localhost:4040
+
+## [ ] Step 7: Set in Twilio Console sandbox webhook to ngrok/webhook HTTP POST
+
+## [ ] Step 8: Send join code + test msg from WhatsApp
+
+**Monitor server terminal logs for errors.**
