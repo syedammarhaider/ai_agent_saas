@@ -2,176 +2,78 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use App\Services\GeminiService;
 use App\Models\Conversation;
-use App\Models\Message;
-use App\Models\Client;
+use Illuminate\Http\Request;
 
 class ConversationController extends Controller
 {
-    private $geminiService;
-
-    public function __construct(GeminiService $geminiService)
+    /** Page */
+    public function chat()
     {
-        $this->geminiService = $geminiService;
+        return view('chat');
     }
 
-    public function index(Request $request)
+    /** GET /api/conversations */
+    public function list(Request $request)
     {
-        $conversations = $request->user()
-            ->conversations()
-            ->with('client')
-            ->latest()
-            ->get();
+        // No user_id filter — all webhook-created conversations are visible
+        $q = Conversation::with(['client', 'messages' => fn($x) => $x->latest()->limit(1)])->latest();
 
-        return response()->json([
-            'data' => $conversations
-        ]);
-    }
-
-    public function show(Request $request, $id)
-    {
-        $conversation = $request->user()
-            ->conversations()
-            ->with('client')
-            ->findOrFail($id);
-
-        $messages = $conversation->messages()
-            ->oldest()
-            ->get();
-
-        return response()->json($conversation);
-    }
-
-    public function store(Request $request)
-    {
-        $validator = \Validator::make($request->all(), [
-            'title' => 'required|string|max:255',
-            'client_id' => 'nullable|exists:clients,id',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
+        if ($p = $request->platform) {
+            $q->whereRaw('LOWER(platform) = ?', [strtolower($p)]);
         }
 
-        $conversation = $request->user()->conversations()->create([
-            'title' => $request->title,
-            'client_id' => $request->client_id,
+        if ($s = $request->search) {
+            $q->whereHas('client', fn($x) => $x->where('name', 'like', "%$s%"));
+        }
+
+        $convs = $q->get()->map(fn($c) => [
+            'id'           => $c->id,
+            'client_name'  => $c->client?->name ?? ($c->title ?? 'Conv #' . $c->id),
+            'platform'     => strtolower($c->platform ?? 'api'),
+            'status'       => $c->status ?? 'open',
+            'last_message' => $c->messages->first()?->content,
+            'updated_at'   => $c->updated_at,
+            'created_at'   => $c->created_at,
         ]);
 
-        return response()->json($conversation, 201);
+        return response()->json(['conversations' => $convs]);
     }
 
-    public function destroy(Request $request, $id)
-    {
-        $conversation = $request->user()
-            ->conversations()
-            ->findOrFail($id);
-
-        $conversation->delete();
-
-        return response()->json([
-            'message' => 'Conversation deleted successfully'
-        ]);
-    }
-
+    /** GET /api/conversations/{id}/messages */
     public function messages(Request $request, $id)
     {
-        $conversation = $request->user()
-            ->conversations()
-            ->findOrFail($id);
+        $msgs = Conversation::findOrFail($id)->messages()->oldest()->get()
+            ->map(fn($m) => [
+                'id'          => $m->id,
+                'content'     => $m->content,
+                'sender_type' => $m->sender_type ?? 'client',
+                'created_at'  => $m->created_at,
+            ]);
 
-        $messages = $conversation->messages()
-            ->oldest()
-            ->get();
-
-        return response()->json([
-            'data' => $messages
-        ]);
+        return response()->json(['messages' => $msgs]);
     }
 
-    public function sendMessage(Request $request)
+    /** POST /api/conversations/{id}/reply */
+    public function reply(Request $request, $id)
     {
-        $validator = \Validator::make($request->all(), [
-            'content' => 'required|string',
-            'conversation_id' => 'nullable|exists:conversations,id',
+        $request->validate(['content' => 'required|string|max:4000']);
+
+        $conv = Conversation::findOrFail($id);
+        $msg  = $conv->messages()->create([
+            'content'     => $request->content,
+            'sender_type' => 'agent',
         ]);
+        $conv->touch();
 
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
+        return response()->json(['success' => true, 'message' => $msg]);
+    }
 
-        try {
-            $user = $request->user();
-            $conversation = null;
-
-            // Find or create conversation
-            if ($request->conversation_id) {
-                $conversation = $user->conversations()->findOrFail($request->conversation_id);
-            } else {
-                // Create new conversation
-                $conversation = $user->conversations()->create([
-                    'title' => substr($request->content, 0, 50) . '...',
-                ]);
-            }
-
-            // Save user message
-            $userMessage = $conversation->messages()->create([
-                'content' => $request->content,
-                'role' => 'user',
-            ]);
-
-            // Get conversation history for context
-            $history = $conversation->messages()
-                ->oldest()
-                ->take(10) // Last 10 messages for context
-                ->get()
-                ->map(function ($msg) {
-                    return [
-                        'role' => $msg->role,
-                        'content' => $msg->content
-                    ];
-                })
-                ->toArray();
-
-            // Generate AI response
-            $aiResponse = $this->geminiService->generateResponse(
-                $request->content,
-                $history
-            );
-
-            // Save AI message
-            $aiMessage = $conversation->messages()->create([
-                'content' => $aiResponse,
-                'role' => 'assistant',
-            ]);
-
-            // Update conversation title if it's the first message
-            if ($conversation->messages()->count() === 2) {
-                $conversation->update([
-                    'title' => substr($request->content, 0, 50) . '...'
-                ]);
-            }
-
-            return response()->json([
-                'message' => $aiResponse,
-                'user_message' => $userMessage,
-                'ai_message' => $aiMessage,
-                'conversation' => $conversation
-            ]);
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to send message',
-                'error' => $e->getMessage()
-            ], 500);
-        }
+    /** PUT /api/conversations/{id}/status */
+    public function updateStatus(Request $request, $id)
+    {
+        $request->validate(['status' => 'required|in:open,closed,pending']);
+        Conversation::findOrFail($id)->update(['status' => $request->status]);
+        return response()->json(['success' => true]);
     }
 }

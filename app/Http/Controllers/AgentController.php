@@ -1,173 +1,225 @@
 <?php
-
+// app/Http/Controllers/AgentController.php
 namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
-use App\Services\GeminiService;
-use App\Models\AgentLog;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class AgentController extends Controller
 {
-    private $geminiService;
+    private string $pythonUrl;
 
-    public function __construct(GeminiService $geminiService)
+    public function __construct()
     {
-        $this->geminiService = $geminiService;
+        $this->pythonUrl = rtrim(
+            env('PYTHON_BACKEND_URL', env('AGENT_URL', 'http://127.0.0.1:8003')),
+            '/'
+        );
     }
 
-    public function status(Request $request)
+    /** Page view */
+    public function index()
     {
-        $user = $request->user();
-        
-        $tasksToday = $user->agentLogs()->whereDate('created_at', now())->count();
-        $successRate = $this->calculateSuccessRate($user);
-        
-        return response()->json([
-            'status' => 'running', // In a real app, you'd check actual agent status
-            'tasks_today' => $tasksToday,
-            'success_rate' => $successRate,
-            'last_active' => $user->agentLogs()->latest()->first()?->created_at,
-        ]);
+        return view('agent');
     }
 
-    public function metrics(Request $request)
+    /**
+     * Health check
+     * GET /api/agent/health
+     */
+    public function health()
     {
-        $user = $request->user();
-        
-        $totalLogs = $user->agentLogs()->count();
-        $successful = $user->agentLogs()->where('status', 'success')->count();
-        $failed = $user->agentLogs()->where('status', 'failed')->count();
-        $processing = $user->agentLogs()->where('status', 'processing')->count();
-        
-        return response()->json([
-            'total' => $totalLogs,
-            'successful' => $successful,
-            'failed' => $failed,
-            'processing' => $processing,
-        ]);
-    }
-
-    public function logs(Request $request)
-    {
-        $user = $request->user();
-        
-        $logs = $user->agentLogs()
-            ->latest()
-            ->paginate(50);
-        
-        return response()->json([
-            'data' => $logs->items(),
-            'pagination' => [
-                'current_page' => $logs->currentPage(),
-                'last_page' => $logs->lastPage(),
-                'per_page' => $logs->perPage(),
-                'total' => $logs->total(),
-            ]
-        ]);
-    }
-
-    public function toggle(Request $request)
-    {
-        // In a real application, you'd implement actual agent start/stop logic
-        $isRunning = $request->input('current_status') === 'running';
-        $newStatus = $isRunning ? 'stopped' : 'running';
-        
-        // Log the action
-        AgentLog::create([
-            'action' => 'toggle_agent',
-            'message' => "Agent status changed to {$newStatus}",
-            'status' => 'success',
-            'user_id' => $request->user()->id,
-        ]);
-        
-        return response()->json([
-            'status' => $newStatus,
-            'message' => "Agent is now {$newStatus}"
-        ]);
-    }
-
-    public function execute(Request $request)
-    {
-        $action = $request->input('action');
-        $data = $request->input('data', []);
-        
-        // Create a processing log
-        $log = AgentLog::create([
-            'action' => $action,
-            'message' => 'Executing task...',
-            'status' => 'processing',
-            'data' => $data,
-            'user_id' => $request->user()->id,
-        ]);
-        
         try {
-            // Simulate task execution based on action
-            $result = $this->executeTask($action, $data);
-            
-            // Update log with success
-            $log->update([
-                'status' => 'success',
-                'message' => 'Task completed successfully',
-                'data' => array_merge($data, ['result' => $result])
-            ]);
-            
-            return response()->json([
-                'message' => 'Task executed successfully',
-                'result' => $result
-            ]);
-            
+            $res = Http::timeout(4)->get("{$this->pythonUrl}/health");
+            if ($res->successful()) {
+                return response()->json(['status' => 'online']);
+            }
+            return response()->json(['status' => 'degraded'], 200);
         } catch (\Exception $e) {
-            // Update log with failure
-            $log->update([
-                'status' => 'failed',
-                'message' => 'Task failed: ' . $e->getMessage()
+            return response()->json(['status' => 'offline'], 200);
+        }
+    }
+
+    /**
+     * Send message to AI agent
+     * POST /api/agent/chat
+     */
+    public function chat(Request $request)
+    {
+        $validated = $request->validate([
+            'user_id'  => 'required|string|max:200',
+            'message'  => 'required|string|max:4000',
+            'platform' => 'nullable|string|in:web,whatsapp,slack,api',
+        ]);
+
+        $userId   = $validated['user_id'];
+        $message  = trim($validated['message']);
+        $platform = $validated['platform'] ?? 'web';
+
+        if (empty($message)) {
+            return response()->json(['reply' => 'Please type a message.'], 422);
+        }
+
+        try {
+            $response = Http::timeout(90)
+                ->retry(2, 3000)
+                ->post("{$this->pythonUrl}/chat", [
+                    'user_id'  => $userId,
+                    'message'  => $message,
+                    'platform' => $platform,
+                ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+
+                // Normalize reply field — agent might return different keys
+                $reply = $data['reply']
+                    ?? $data['response']
+                    ?? $data['message']
+                    ?? $data['text']
+                    ?? $data['content']
+                    ?? null;
+
+                if (empty($reply)) {
+                    Log::warning('Python backend empty reply', ['data' => $data]);
+                    return response()->json([
+                        'reply' => 'I processed your request but had trouble forming a response. Please try again.',
+                    ]);
+                }
+
+                // Strip any raw technical metadata the Python agent might inject
+                $reply = $this->cleanReply($reply);
+
+                return response()->json([
+                    'reply'     => $reply,
+                    'user_id'   => $userId,
+                    'platform'  => $platform,
+                    'timestamp' => now()->toISOString(),
+                ]);
+            }
+
+            Log::error('Python backend non-200', [
+                'status' => $response->status(),
+                'url'    => $this->pythonUrl,
             ]);
-            
+
             return response()->json([
-                'message' => 'Task execution failed',
-                'error' => $e->getMessage()
-            ], 500);
+                'reply' => 'The AI service encountered an issue. Please try again in a moment.',
+            ]);
+
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            Log::error('Cannot connect to Python backend: ' . $e->getMessage());
+
+            return response()->json([
+                'reply' => "I'm currently unable to reach the AI backend. Please make sure the Python server is running:\n\n`uvicorn main:app --host 0.0.0.0 --port 8003`",
+            ]);
+
+        } catch (\Illuminate\Http\Client\RequestException $e) {
+            return response()->json([
+                'reply' => 'The request timed out. The AI may be processing a complex query — please try again.',
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('AgentController::chat error: ' . $e->getMessage());
+            return response()->json([
+                'reply' => 'An unexpected error occurred. Please try again.',
+            ]);
         }
     }
 
-    private function executeTask($action, $data)
+    /**
+     * Get conversation history
+     * GET /api/agent/history/{userId}
+     */
+    public function history(Request $request, string $userId)
     {
-        switch ($action) {
-            case 'test_task':
-                return [
-                    'message' => 'Test task completed',
-                    'timestamp' => now(),
-                    'data' => $data
-                ];
-                
-            case 'send_email':
-                // Simulate sending email
-                return [
-                    'message' => 'Email sent successfully',
-                    'recipient' => $data['recipient'] ?? 'unknown'
-                ];
-                
-            case 'generate_report':
-                // Simulate generating report
-                return [
-                    'message' => 'Report generated',
-                    'report_id' => uniqid(),
-                    'data' => $data
-                ];
-                
-            default:
-                throw new \Exception("Unknown action: {$action}");
+        try {
+            $res = Http::timeout(10)->get("{$this->pythonUrl}/history/" . urlencode($userId));
+
+            if ($res->successful()) {
+                $data = $res->json();
+                // Normalize: clean all agent messages
+                if (isset($data['messages'])) {
+                    $data['messages'] = array_map(function ($msg) {
+                        if (($msg['role'] ?? '') === 'assistant') {
+                            $msg['content'] = $this->cleanReply($msg['content'] ?? '');
+                        }
+                        return $msg;
+                    }, $data['messages']);
+                }
+                return response()->json($data);
+            }
+
+            return response()->json(['messages' => []]);
+
+        } catch (\Exception $e) {
+            return response()->json(['messages' => []]);
         }
     }
 
-    private function calculateSuccessRate($user)
+    /**
+     * Clear conversation
+     * DELETE /api/agent/history
+     */
+    public function clearHistory(Request $request)
     {
-        $totalLogs = $user->agentLogs()->count();
-        if ($totalLogs === 0) {
-            return 0;
+        $userId = $request->input('user_id');
+        if (empty($userId)) {
+            return response()->json(['success' => false, 'message' => 'user_id required'], 422);
         }
 
-        $successfulLogs = $user->agentLogs()->where('status', 'success')->count();
-        return round(($successfulLogs / $totalLogs) * 100, 2);
+        try {
+            Http::timeout(6)->delete("{$this->pythonUrl}/history/{$userId}");
+        } catch (\Exception $e) {
+            // Non-critical
+        }
+
+        return response()->json(['success' => true]);
+    }
+
+    /**
+     * Get all users
+     * GET /api/agent/users
+     */
+    public function users()
+    {
+        try {
+            $res = Http::timeout(8)->get("{$this->pythonUrl}/history");
+            return $res->successful()
+                ? response()->json($res->json())
+                : response()->json(['users' => []]);
+        } catch (\Exception $e) {
+            return response()->json(['users' => []]);
+        }
+    }
+
+    /**
+     * Remove technical jargon and DS artifacts from AI replies.
+     * Makes responses natural and human-readable.
+     */
+    private function cleanReply(string $reply): string
+    {
+        // Remove common technical prefixes the Python agent might add
+        $patterns = [
+            '/^(AI Agent:|Agent:|Bot:|Response:|Reply:|Output:)\s*/i',
+            '/\[DEBUG:.*?\]/s',
+            '/\[SYSTEM:.*?\]/s',
+            '/```json\s*\{.*?\}\s*```/s',  // raw JSON blocks
+        ];
+
+        foreach ($patterns as $pattern) {
+            $reply = preg_replace($pattern, '', $reply);
+        }
+
+        // Trim whitespace
+        $reply = trim($reply);
+
+        // If somehow still empty
+        if (empty($reply)) {
+            $reply = 'I understand. How can I help you further?';
+        }
+
+        return $reply;
     }
 }

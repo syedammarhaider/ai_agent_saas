@@ -37,30 +37,29 @@ Route::middleware('auth:sanctum')->group(function () {
 
     // Agent Routes
     Route::prefix('/agent')->group(function () {
-        Route::get('/status', [AgentController::class, 'status']);
-        Route::get('/metrics', [AgentController::class, 'metrics']);
-        Route::get('/logs', [AgentController::class, 'logs']);
-        Route::post('/toggle', [AgentController::class, 'toggle']);
-        Route::post('/execute', [AgentController::class, 'execute']);
+        Route::get('/health', [AgentController::class, 'health']);
+        Route::post('/chat', [AgentController::class, 'chat']);
+        Route::get('/history/{userId}', [AgentController::class, 'history']);
+        Route::delete('/history', [AgentController::class, 'clearHistory']);
+        Route::get('/users', [AgentController::class, 'users']);
     });
 
     // Conversation Routes
     Route::prefix('/conversations')->group(function () {
-        Route::get('/', [ConversationController::class, 'index']);
-        Route::post('/', [ConversationController::class, 'store']);
-        Route::get('/{id}', [ConversationController::class, 'show']);
-        Route::delete('/{id}', [ConversationController::class, 'destroy']);
+        Route::get('/', [ConversationController::class, 'list']);
         Route::get('/{id}/messages', [ConversationController::class, 'messages']);
-        Route::post('/message', [ConversationController::class, 'sendMessage']);
+        Route::post('/{id}/reply', [ConversationController::class, 'reply']);
     });
 
     // Client Routes
     Route::prefix('/clients')->group(function () {
-        Route::get('/', [ClientController::class, 'index']);
+        Route::get('/', [ClientController::class, 'list']);
         Route::post('/', [ClientController::class, 'store']);
-        Route::get('/{id}', [ClientController::class, 'show']);
         Route::put('/{id}', [ClientController::class, 'update']);
+        Route::patch('/{id}/status', [ClientController::class, 'updateStatus']);
         Route::delete('/{id}', [ClientController::class, 'destroy']);
+        Route::get('/stats', [ClientController::class, 'stats']);
+        Route::get('/{id}/conversations', [ClientController::class, 'conversations']);
     });
 
     // Invoice Routes

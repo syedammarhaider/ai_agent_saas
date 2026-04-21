@@ -6,7 +6,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use App\Models\User;
+use App\Models\SimpleUser;
 
 class AuthController extends Controller
 {
@@ -14,7 +14,7 @@ class AuthController extends Controller
     {
         $validator = Validator::make($request->all(), [
             'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255|unique:users',
+            'email' => 'required|string|email|max:255',
             'password' => 'required|string|min:8|confirmed',
         ]);
 
@@ -23,18 +23,16 @@ class AuthController extends Controller
         }
 
         try {
-            $user = User::create([
-                'name' => $request->name,
-                'email' => $request->email,
-                'password' => Hash::make($request->password),
-            ]);
+            $user = new SimpleUser();
+            $user->name = $request->name;
+            $user->email = $request->email;
+            $user->password = Hash::make($request->password);
 
             Auth::login($user);
 
             return redirect('/dashboard');
-
         } catch (\Exception $e) {
-            return back()->with('error', 'Registration failed: ' . $e->getMessage());
+            return back()->with('error', 'Registration failed. Please try again.');
         }
     }
 
