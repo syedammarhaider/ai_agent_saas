@@ -1,4 +1,3 @@
-
 <?php
 
 use Illuminate\Support\Facades\Route;
@@ -47,6 +46,8 @@ Route::middleware('auth')->group(function () {
     Route::get('/api/clients',                    [ClientController::class, 'list']);
     Route::post('/api/clients',                   [ClientController::class, 'store']);
     Route::put('/api/clients/{id}',               [ClientController::class, 'update']);
+    Route::patch('/api/clients/{id}/status',      [ClientController::class, 'updateStatus']);
+    Route::post('/api/clients/{id}/send-message', [ClientController::class, 'sendMessage']);
     Route::delete('/api/clients/{id}',            [ClientController::class, 'destroy']);
     Route::get('/api/clients/{id}/conversations', [ClientController::class, 'conversations']);
 
@@ -58,22 +59,9 @@ Route::middleware('auth')->group(function () {
 
     // Agent API
     Route::prefix('api/agent')->group(function () {
+        Route::get('/health', function() { return response()->json(['status' => 'online']); });
         Route::post('/chat', [AgentController::class, 'chat']);
         Route::get('/history/{userId}', [AgentController::class, 'history']);
         Route::delete('/history', [AgentController::class, 'clearHistory']);
     });
-
-    // Clients API
-    Route::get('/api/clients/stats',              [ClientController::class, 'stats']);
-    Route::get('/api/clients',                    [ClientController::class, 'list']);
-    Route::post('/api/clients',                   [ClientController::class, 'store']);
-    Route::put('/api/clients/{id}',               [ClientController::class, 'update']);
-    Route::delete('/api/clients/{id}',            [ClientController::class, 'destroy']);
-    Route::get('/api/clients/{id}/conversations', [ClientController::class, 'conversations']);
-
-    // Conversations / Chat API
-    Route::get('/api/conversations',               [ConversationController::class, 'list']);
-    Route::get('/api/conversations/{id}/messages', [ConversationController::class, 'messages']);
-    Route::post('/api/conversations/{id}/reply',   [ConversationController::class, 'reply']);
-    Route::put('/api/conversations/{id}/status',   [ConversationController::class, 'updateStatus']);
-}); 
+});

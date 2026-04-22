@@ -2,33 +2,23 @@
 
 namespace App\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Conversation extends Model
 {
-    use HasFactory;
-
     protected $fillable = [
-        'user_id', 'client_id', 'platform', 'status', 'title',
+        'user_id', 'client_id', 'title', 'platform',
+        'external_id', 'status', 'metadata',
     ];
 
-    protected $attributes = [
-        'platform' => 'api',
-        'status'   => 'open',
-    ];
-
-    public function user()
-    {
-        return $this->belongsTo(User::class);
-    }
-
-    public function client()
+    public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
     }
 
-    public function messages()
+    public function messages(): HasMany
     {
         return $this->hasMany(Message::class);
     }

@@ -69,7 +69,6 @@
 }
 .cl-name-cell { display: flex; align-items: center; gap: 11px; min-width: 0; }
 .cl-name { font-size: 13.5px; font-weight: 600; color: var(--txt); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cl-company { font-size: 11.5px; color: var(--txt-4); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .cl-contact-cell { display: flex; flex-direction: column; gap: 2px; justify-content: center; min-width: 0; }
 .cl-email { font-size: 12px; color: var(--txt-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -93,17 +92,17 @@
 
 /* DETAIL PANEL */
 .detail-panel {
-    width: 316px; flex-shrink: 0; position: sticky; top: 24px;
+    width: 360px; flex-shrink: 0; position: sticky; top: 24px;
     background: var(--bg-card); border: 1px solid var(--border);
     border-radius: var(--radius-xl); overflow: hidden; box-shadow: var(--shadow-lg);
     animation: slideIn 0.28s var(--ease-back) both;
 }
 @keyframes slideIn { from { opacity:0; transform:translateX(18px) scale(0.97); } to { opacity:1; transform:translateX(0) scale(1); } }
-@media(max-width:1100px) { .detail-panel { width: 280px; } }
+@media(max-width:1100px) { .detail-panel { width: 320px; } }
 @media(max-width:900px) {
     .detail-panel {
         position: fixed; right: 16px; top: 90px; width: calc(100vw - 32px);
-        max-width: 360px; z-index: 700;
+        max-width: 400px; z-index: 700; max-height: calc(100vh - 110px); overflow-y: auto;
     }
 }
 
@@ -136,6 +135,50 @@
 .dp-row:last-child { margin-bottom: 0; }
 .dp-key { font-size: 12px; color: var(--txt-3); flex-shrink: 0; }
 .dp-val { font-size: 12.5px; color: var(--txt); font-weight: 500; text-align: right; word-break: break-all; }
+
+/* Status Dropdown */
+.status-dropdown {
+    position: relative; width: 100%; margin-bottom: 12px;
+}
+.status-select {
+    width: 100%; padding: 10px 13px; background: var(--bg-input);
+    border: 1px solid var(--border-md); border-radius: var(--radius-md);
+    font-size: 13px; font-family: var(--font-body); color: var(--txt);
+    cursor: pointer; outline: none; transition: all var(--trans);
+}
+.status-select:hover { border-color: var(--border-str); }
+.status-select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+/* Message Box */
+.msg-box-section { padding: 16px 20px; background: var(--bg-raised); }
+.msg-textarea {
+    width: 100%; min-height: 100px; padding: 12px; background: var(--bg-input);
+    border: 1px solid var(--border-md); border-radius: var(--radius-md);
+    font-size: 13px; font-family: var(--font-body); color: var(--txt);
+    resize: vertical; outline: none; transition: all var(--trans);
+}
+.msg-textarea::placeholder { color: var(--txt-4); }
+.msg-textarea:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
+.send-msg-btn {
+    width: 100%; padding: 10px; margin-top: 10px; border-radius: var(--radius-md);
+    font-size: 13px; font-weight: 600; font-family: var(--font-body);
+    cursor: pointer; border: none; transition: all 160ms; text-align: center;
+    background: var(--accent); color: white;
+    display: flex; align-items: center; justify-content: center; gap: 7px;
+}
+.send-msg-btn:hover { filter: brightness(1.1); }
+.send-msg-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* Project Details */
+.project-details-box {
+    background: var(--bg-raised); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: 14px; margin-top: 10px;
+}
+.project-details-text {
+    font-size: 13px; line-height: 1.6; color: var(--txt-2);
+    white-space: pre-wrap; word-wrap: break-word;
+}
 
 .dp-actions { padding: 14px 20px; display: flex; flex-direction: column; gap: 8px; }
 .dp-action-btn {
@@ -220,7 +263,7 @@
         <div class="st-card">
             <div class="st-label" style="color:var(--green)">
                 <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                Active
+                In Progress
             </div>
             <div class="st-value" id="stActive" style="color:var(--green)">—</div>
         </div>
@@ -243,11 +286,8 @@
     <!-- Filters -->
     <div class="filter-bar anim anim-d2">
         <button class="fpill on" onclick="setFilter('all',this)">All Clients</button>
-        <button class="fpill" onclick="setFilter('active',this)">Active</button>
         <button class="fpill" onclick="setFilter('whatsapp',this)">📱 WhatsApp</button>
         <button class="fpill" onclick="setFilter('slack',this)">⚡ Slack</button>
-        <button class="fpill" onclick="setFilter('api',this)">🔗 API</button>
-        <button class="fpill" onclick="setFilter('web',this)">🌐 Web</button>
     </div>
 
     <!-- Main -->
@@ -299,18 +339,16 @@
                     <label class="field-label">Phone Number</label>
                     <input class="inp" id="mPhone" placeholder="+92 300 1234567">
                 </div>
-                <div class="field-wrap">
-                    <label class="field-label">Company</label>
-                    <input class="inp" id="mCompany" placeholder="Company or Org">
-                </div>
-                <div class="field-wrap">
-                    <label class="field-label">Channel</label>
+                <div class="field-wrap full">
+                    <label class="field-label">Channel *</label>
                     <select class="inp" id="mChannel">
-                        <option value="api">API</option>
-                        <option value="whatsapp">WhatsApp</option>
-                        <option value="slack">Slack</option>
-                        <option value="web">Web</option>
+                        <option value="whatsapp">📱 WhatsApp</option>
+                        <option value="slack">⚡ Slack</option>
                     </select>
+                </div>
+                <div class="field-wrap full">
+                    <label class="field-label">Project Details</label>
+                    <textarea class="inp" id="mProject" rows="3" placeholder="Brief description of the project..."></textarea>
                 </div>
             </div>
         </div>
@@ -332,13 +370,15 @@ const CSRF = document.querySelector('meta[name="csrf-token"]')?.content ?? '';
 const PLAT_CONFIG = {
     whatsapp: { icon:'📱', label:'WhatsApp', cls:'badge-green',  color:'#22C55E' },
     slack:    { icon:'⚡', label:'Slack',     cls:'badge-purple', color:'var(--purple)' },
-    api:      { icon:'🔗', label:'API',       cls:'badge-blue',   color:'var(--accent)' },
-    web:      { icon:'🌐', label:'Web',       cls:'badge-cyan',   color:'var(--cyan)' },
-    twilio:   { icon:'📞', label:'Twilio',    cls:'badge-red',    color:'var(--red)' },
-    email:    { icon:'📧', label:'Email',     cls:'badge-amber',  color:'var(--amber)' },
 };
 
 const AVATAR_COLORS = ['#4F46E5','#7C3AED','#059669','#D97706','#DC2626','#0891B2','#64748B','#0D9488'];
+
+const STATUS_CONFIG = {
+    in_progress: { label: 'In Progress', color: '#4F46E5', cls: 'badge-blue' },
+    completed:   { label: 'Completed',   color: '#059669', cls: 'badge-green' },
+    cancelled:   { label: 'Cancelled',   color: '#DC2626', cls: 'badge-red' },
+};
 
 let allClients = [], curFilter = 'all', searchQuery = '', selectedId = null, searchTimer = null;
 
@@ -350,18 +390,18 @@ function avatarColor(name) {
 function initials(name) {
     return String(name||'?').split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
 }
-function platCfg(plat) { return PLAT_CONFIG[String(plat).toLowerCase()] || PLAT_CONFIG.api; }
+function platCfg(plat) { return PLAT_CONFIG[String(plat).toLowerCase()] || PLAT_CONFIG.whatsapp; }
+function statusCfg(status) { return STATUS_CONFIG[status] || STATUS_CONFIG.in_progress; }
 
 async function load() {
     try {
         const q = new URLSearchParams();
         if (searchQuery) q.set('search', searchQuery);
-        if (curFilter !== 'all' && curFilter !== 'active') q.set('platform', curFilter);
+        if (curFilter !== 'all') q.set('platform', curFilter);
         const res = await fetch('/api/clients?' + q, { headers:{'X-CSRF-TOKEN':CSRF} });
         if (!res.ok) throw new Error(res.status);
         const d = await res.json();
         allClients = d.clients ?? [];
-        if (curFilter === 'active') allClients = allClients.filter(c => (c.status ?? 'active') === 'active');
         render();
         updateStats();
     } catch(e) {
@@ -380,17 +420,16 @@ function render() {
     }
 
     el.innerHTML = allClients.map(c => {
-        const pc = platCfg((c.platforms||[])[0] || c.channel || 'api');
+        const pc = platCfg((c.platforms||[])[0] || c.channel || 'whatsapp');
+        const sc = statusCfg(c.status);
         const bgCol = avatarColor(c.name);
         const isSelected = c.id === selectedId;
-        const status = c.status ?? 'active';
         return `
         <div class="cl-row ${isSelected ? 'selected' : ''}" onclick="selectClient('${esc(c.id)}')" id="row-${esc(c.id)}">
             <div class="cl-name-cell">
                 <div class="cl-av" style="background:${bgCol}">${esc(initials(c.name))}</div>
                 <div>
                     <div class="cl-name">${esc(c.name || 'Unknown')}</div>
-                    <div class="cl-company">${esc(c.company || '—')}</div>
                 </div>
             </div>
             <div class="cl-contact-cell">
@@ -401,7 +440,7 @@ function render() {
                 <span class="badge ${pc.cls}">${pc.icon} ${pc.label}</span>
             </div>
             <div>
-                <span class="badge ${status === 'active' ? 'badge-green' : 'badge-neutral'}">${status}</span>
+                <span class="badge ${sc.cls}">${sc.label}</span>
             </div>
             <div class="cl-actions">
                 <button class="del-btn" onclick="event.stopPropagation(); deleteClient('${esc(c.id)}', '${esc(c.name)}')">Delete</button>
@@ -412,9 +451,9 @@ function render() {
 
 function updateStats() {
     const total = allClients.length;
-    const active = allClients.filter(c => (c.status ?? 'active') === 'active').length;
-    const wa = allClients.filter(c => ((c.platforms||[])[0]||c.channel||'api').toLowerCase() === 'whatsapp').length;
-    const plats = new Set(allClients.flatMap(c => c.platforms || (c.channel ? [c.channel] : ['api'])));
+    const active = allClients.filter(c => c.status === 'in_progress').length;
+    const wa = allClients.filter(c => ((c.platforms||[])[0]||c.channel||'').toLowerCase() === 'whatsapp').length;
+    const plats = new Set(allClients.flatMap(c => c.platforms || (c.channel ? [c.channel] : ['whatsapp'])));
     document.getElementById('stTotal').textContent = total;
     document.getElementById('stActive').textContent = active;
     document.getElementById('stWA').textContent = wa;
@@ -439,9 +478,9 @@ function selectClient(id) {
 window.selectClient = selectClient;
 
 function renderDetailPanel(c) {
-    const pc = platCfg((c.platforms||[])[0] || c.channel || 'api');
+    const pc = platCfg((c.platforms||[])[0] || c.channel || 'whatsapp');
     const bgCol = avatarColor(c.name);
-    const status = c.status ?? 'active';
+    const sc = statusCfg(c.status);
     const mount = document.getElementById('detailPanelMount');
     mount.innerHTML = `
     <div class="detail-panel" id="detailPanel">
@@ -449,23 +488,46 @@ function renderDetailPanel(c) {
             <button class="dp-close" onclick="selectClient('${esc(c.id)}')">×</button>
             <div class="dp-avatar">${esc(initials(c.name))}</div>
             <div class="dp-name">${esc(c.name || 'Unknown')}</div>
-            <div class="dp-sub">${pc.icon} ${pc.label} · ${esc(status)}</div>
+            <div class="dp-sub">${pc.icon} ${pc.label}</div>
         </div>
         <div class="dp-section">
             <div class="dp-section-label">Contact Info</div>
             <div class="dp-row"><span class="dp-key">Email</span><span class="dp-val">${esc(c.email || '—')}</span></div>
             <div class="dp-row"><span class="dp-key">Phone</span><span class="dp-val">${esc(c.phone || '—')}</span></div>
-            <div class="dp-row"><span class="dp-key">Company</span><span class="dp-val">${esc(c.company || '—')}</span></div>
-            <div class="dp-row"><span class="dp-key">Status</span><span class="dp-val"><span class="badge ${status === 'active' ? 'badge-green' : 'badge-neutral'}">${esc(status)}</span></span></div>
         </div>
         <div class="dp-section">
-            <div class="dp-section-label">Channel</div>
-            <div class="dp-row"><span class="dp-key">Platform</span><span class="dp-val"><span class="badge ${pc.cls}">${pc.icon} ${pc.label}</span></span></div>
+            <div class="dp-section-label">Status Management</div>
+            <div class="status-dropdown">
+                <select class="status-select" id="statusSelect-${c.id}" onchange="changeStatus('${c.id}', this.value)">
+                    <option value="in_progress" ${c.status === 'in_progress' ? 'selected' : ''}>⚡ In Progress</option>
+                    <option value="completed" ${c.status === 'completed' ? 'selected' : ''}>✅ Completed</option>
+                    <option value="cancelled" ${c.status === 'cancelled' ? 'selected' : ''}>❌ Cancelled</option>
+                </select>
+            </div>
+            <div style="font-size:11px;color:var(--txt-4);margin-top:6px;">
+                Changing status will send an email notification to the client
+            </div>
+        </div>
+        ${c.project_details ? `
+        <div class="dp-section">
+            <div class="dp-section-label">Project Details</div>
+            <div class="project-details-box">
+                <div class="project-details-text">${esc(c.project_details)}</div>
+            </div>
+        </div>
+        ` : ''}
+        <div class="msg-box-section">
+            <div class="dp-section-label">Send Message to Client</div>
+            <textarea class="msg-textarea" id="msgText-${c.id}" placeholder="Type your message to ${c.name}..."></textarea>
+            <button class="send-msg-btn" onclick="sendMessage('${c.id}')">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                Send Email
+            </button>
         </div>
         <div class="dp-actions">
-            ${c.email ? `<a href="mailto:${esc(c.email)}" class="dp-action-btn dp-action-primary">📧 Send Email</a>` : ''}
-            ${c.phone ? `<a href="https://wa.me/${c.phone.replace(/\D/g,'')}" target="_blank" class="dp-action-btn dp-action-ghost">📱 Open WhatsApp</a>` : ''}
-            <a href="{{ route('chat') }}" class="dp-action-btn dp-action-ghost">💬 View Conversations</a>
+            ${c.email ? `<a href="mailto:${esc(c.email)}" class="dp-action-btn dp-action-primary">📧 Open Email Client</a>` : ''}
+            ${c.phone && c.channel === 'whatsapp' ? `<a href="https://wa.me/${c.phone.replace(/\D/g,'')}" target="_blank" class="dp-action-btn dp-action-ghost">📱 Open WhatsApp</a>` : ''}
+            <a href="{{ route('chat') }}" class="dp-action-btn dp-action-ghost">💬 View Conversations (${c.conversation_count || 0})</a>
             <button class="dp-action-btn dp-action-danger" onclick="deleteClient('${esc(c.id)}','${esc(c.name)}')">
                 🗑️ Delete Client
             </button>
@@ -473,16 +535,96 @@ function renderDetailPanel(c) {
     </div>`;
 }
 
-async function deleteClient(id, name) {
-    if (!confirm('Delete "' + (name || 'this client') + '"? This cannot be undone.')) return;
+async function changeStatus(id, newStatus) {
+    const client = allClients.find(c => String(c.id) === String(id));
+    if (!client || client.status === newStatus) return;
+
+    const sc = statusCfg(newStatus);
+    if (!confirm(`Change status to "${sc.label}"?\n\nAn email notification will be sent to ${client.email}`)) {
+        // Revert dropdown
+        document.getElementById('statusSelect-' + id).value = client.status;
+        return;
+    }
+
     try {
-        const res = await fetch('/api/clients/' + encodeURIComponent(id), { method:'DELETE', headers:{'X-CSRF-TOKEN':CSRF} });
+        const res = await fetch('/api/clients/' + encodeURIComponent(id) + '/status', {
+            method: 'PATCH',
+            headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN':CSRF },
+            body: JSON.stringify({ status: newStatus })
+        });
+
         if (res.ok) {
-            if (selectedId === id) { selectedId = null; document.getElementById('detailPanelMount').innerHTML = ''; }
-            showToast('Client deleted', 'success');
-            load();
+            const data = await res.json();
+            showToast(data.email_sent ? 'Status updated and email sent!' : 'Status updated', 'success');
+            load(); // Reload to reflect changes
+        } else {
+            showToast('Failed to update status', 'error');
+            document.getElementById('statusSelect-' + id).value = client.status;
         }
-    } catch(e) { showToast('Delete failed', 'error'); }
+    } catch(e) {
+        showToast('Error: ' + e.message, 'error');
+        document.getElementById('statusSelect-' + id).value = client.status;
+    }
+}
+window.changeStatus = changeStatus;
+
+async function sendMessage(id) {
+    const textarea = document.getElementById('msgText-' + id);
+    const message = textarea.value.trim();
+    
+    if (!message) {
+        showToast('Please enter a message', 'error');
+        return;
+    }
+
+    const client = allClients.find(c => String(c.id) === String(id));
+    if (!confirm(`Send this message to ${client.name} (${client.email})?`)) return;
+
+    try {
+        const res = await fetch('/api/clients/' + encodeURIComponent(id) + '/send-message', {
+            method: 'POST',
+            headers: { 'Content-Type':'application/json', 'X-CSRF-TOKEN':CSRF },
+            body: JSON.stringify({ message })
+        });
+
+        const data = await res.json();
+        
+        if (data.success) {
+            showToast('Message sent successfully!', 'success');
+            textarea.value = '';
+        } else {
+            showToast(data.message || 'Failed to send message', 'error');
+        }
+    } catch(e) {
+        showToast('Error: ' + e.message, 'error');
+    }
+}
+window.sendMessage = sendMessage;
+
+async function deleteClient(id, name) {
+    if (!confirm(`Delete "${name}" and ALL associated conversations and messages?\n\nThis action cannot be undone.`)) return;
+    
+    try {
+        const res = await fetch('/api/clients/' + encodeURIComponent(id), { 
+            method:'DELETE', 
+            headers:{'X-CSRF-TOKEN':CSRF} 
+        });
+        
+        const data = await res.json();
+        
+        if (data.success) {
+            if (selectedId === id) { 
+                selectedId = null; 
+                document.getElementById('detailPanelMount').innerHTML = ''; 
+            }
+            showToast('Client and all associated data deleted', 'success');
+            load();
+        } else {
+            showToast(data.message || 'Delete failed', 'error');
+        }
+    } catch(e) { 
+        showToast('Delete failed: ' + e.message, 'error'); 
+    }
 }
 window.deleteClient = deleteClient;
 
@@ -513,23 +655,27 @@ document.getElementById('addModal').addEventListener('click', e => {
 async function saveClient() {
     const name  = document.getElementById('mName').value.trim();
     const email = document.getElementById('mEmail').value.trim();
+    const phone = document.getElementById('mPhone').value.trim();
+    const channel = document.getElementById('mChannel').value;
+    const project = document.getElementById('mProject').value.trim();
+    
     if (!name)  { showToast('Name is required', 'error'); return; }
     if (!email) { showToast('Email is required', 'error'); return; }
+    
     try {
         const res = await fetch('/api/clients', {
             method: 'POST',
             headers: {'Content-Type':'application/json','X-CSRF-TOKEN':CSRF},
             body: JSON.stringify({
-                name, email,
-                phone: document.getElementById('mPhone').value,
-                company: document.getElementById('mCompany').value,
-                channel: document.getElementById('mChannel').value,
+                name, email, phone, channel,
+                project_details: project
             })
         });
+        
         if (res.ok) {
             closeAddModal();
-            ['mName','mEmail','mPhone','mCompany'].forEach(id => { document.getElementById(id).value = ''; });
-            document.getElementById('mChannel').value = 'api';
+            ['mName','mEmail','mPhone','mProject'].forEach(id => { document.getElementById(id).value = ''; });
+            document.getElementById('mChannel').value = 'whatsapp';
             showToast('Client added!', 'success');
             load();
         } else {

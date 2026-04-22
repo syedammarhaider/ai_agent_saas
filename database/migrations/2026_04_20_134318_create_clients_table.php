@@ -10,14 +10,14 @@ return new class extends Migration
     {
         Schema::create('clients', function (Blueprint $table) {
             $table->id();
-            // nullable — webhook-created leads have no authenticated user
-            $table->foreignId('user_id')->nullable()->constrained()->nullOnDelete();
+            $table->foreignId('user_id')->nullable()->constrained()->cascadeOnDelete();
             $table->string('name');
             $table->string('email')->unique();
             $table->string('phone')->nullable();
-            $table->string('company')->nullable();
-            $table->string('channel')->default('api');   // api, whatsapp, slack, web
-            $table->string('status')->default('active'); // active, inactive
+            $table->string('channel')->default('api'); // whatsapp, slack, web
+            $table->enum('status', ['in_progress', 'completed', 'cancelled'])->default('in_progress');
+            $table->text('project_details')->nullable();
+            $table->timestamp('last_contacted_at')->nullable();
             $table->timestamps();
         });
     }
