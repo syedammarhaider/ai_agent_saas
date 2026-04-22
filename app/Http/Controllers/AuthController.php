@@ -6,153 +6,86 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
-use App\Models\SimpleUser;
+use App\Models\AdminUser;
 
 class AuthController extends Controller
 {
-    public function register(Request $request)
+    /**
+     * Show login form
+     */
+    public function showLogin()
     {
-        $validator = Validator::make($request->all(), [
-            'name' => 'required|string|max:255',
-            'email' => 'required|string|email|max:255',
-            'password' => 'required|string|min:8|confirmed',
-        ]);
-
-        if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
-        }
-
-        try {
-            $user = new SimpleUser();
-            $user->name = $request->name;
-            $user->email = $request->email;
-            $user->password = Hash::make($request->password);
-
-            Auth::login($user);
-
-            return redirect('/dashboard');
-        } catch (\Exception $e) {
-            return back()->with('error', 'Registration failed. Please try again.');
-        }
+        return view('auth.login');
     }
 
+    /**
+     * Handle admin login
+     */
     public function login(Request $request)
     {
+        // Validate input
         $validator = Validator::make($request->all(), [
             'email' => 'required|email',
-            'password' => 'required',
+            'password' => 'required|min:6',
         ]);
 
         if ($validator->fails()) {
-            return back()->withErrors($validator)->withInput();
+            return back()
+                ->withErrors($validator)
+                ->withInput($request->only('email'));
         }
 
+        // Check if email matches admin email
+        if ($request->email !== 'syedammar496539@gmail.com') {
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['email' => 'Access denied. Only admin can login.']);
+        }
+
+        // Attempt authentication
         if (!Auth::attempt($request->only('email', 'password'))) {
-            return back()->with('error', 'Invalid credentials');
+            return back()
+                ->withInput($request->only('email'))
+                ->withErrors(['password' => 'Invalid password.']);
         }
 
+        // Update last login
+        $admin = Auth::user();
+        $admin->last_login_at = now();
+        $admin->save();
+
+        // Regenerate session
         $request->session()->regenerate();
 
         return redirect()->intended('/dashboard');
     }
 
+    /**
+     * Handle logout
+     */
     public function logout(Request $request)
     {
-        $user = $request->user();
-        if ($user && $user->currentAccessToken()) {
-            $user->currentAccessToken()->delete();
-        }
         Auth::logout();
-        session()->invalidate();
-        session()->regenerateToken();
+        
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
         
         return redirect('/login');
     }
 
+    /**
+     * Get authenticated user
+     */
     public function user(Request $request)
     {
-        return response()->json($request->user());
-    }
-
-    public function forgotPassword(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email|exists:users,email',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
+        if (!$request->user()) {
+            return response()->json(['error' => 'Unauthorized'], 401);
         }
-
-        // Generate password reset token
-        $token = \Str::random(60);
         
-        // Store token in password_reset_tokens table
-        \DB::table('password_reset_tokens')->updateOrInsert(
-            ['email' => $request->email],
-            [
-                'email' => $request->email,
-                'token' => Hash::make($token),
-                'created_at' => now()
-            ]
-        );
-
-        // Send password reset email
-        try {
-            \Mail::to($request->email)->send(new \App\Mail\PasswordResetMail($token));
-            
-            return response()->json([
-                'message' => 'Password reset link sent to your email'
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Failed to send password reset email',
-                'error' => $e->getMessage()
-            ], 500);
-        }
-    }
-
-    public function resetPassword(Request $request)
-    {
-        $validator = Validator::make($request->all(), [
-            'email' => 'required|email|exists:users,email',
-            'token' => 'required',
-            'password' => 'required|string|min:8|confirmed',
-        ]);
-
-        if ($validator->fails()) {
-            return response()->json([
-                'message' => 'Validation failed',
-                'errors' => $validator->errors()
-            ], 422);
-        }
-
-        // Verify token
-        $resetToken = \DB::table('password_reset_tokens')
-            ->where('email', $request->email)
-            ->first();
-
-        if (!$resetToken || !Hash::check($request->token, $resetToken->token)) {
-            return response()->json([
-                'message' => 'Invalid or expired token'
-            ], 400);
-        }
-
-        // Update password
-        $user = User::where('email', $request->email)->first();
-        $user->password = Hash::make($request->password);
-        $user->save();
-
-        // Delete reset token
-        \DB::table('password_reset_tokens')
-            ->where('email', $request->email)
-            ->delete();
-
         return response()->json([
-            'message' => 'Password reset successful'
+            'id' => $request->user()->id,
+            'email' => $request->user()->email,
+            'last_login_at' => $request->user()->last_login_at,
         ]);
     }
 }

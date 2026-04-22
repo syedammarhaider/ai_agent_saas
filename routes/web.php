@@ -13,15 +13,15 @@ Route::get('/', function () {
     return auth()->check() ? redirect('/dashboard') : redirect('/login');
 })->name('app');
 
-// Auth routes
-Route::get('/login', fn() => auth()->check() ? redirect('/dashboard') : view('auth.login'))->name('login');
-Route::post('/login',  [AuthController::class, 'login']);
-Route::get('/register', fn() => auth()->check() ? redirect('/dashboard') : view('auth.register'))->name('register');
-Route::post('/register', [AuthController::class, 'register']);
-Route::post('/logout',   [AuthController::class, 'logout'])->middleware('auth')->name('logout');
+// Auth routes - Admin only
+Route::get('/login', [AuthController::class, 'showLogin'])->name('login');
+Route::post('/login', [AuthController::class, 'login']);
 
 // Protected routes
 Route::middleware('auth')->group(function () {
+
+    // Logout
+    Route::post('/logout', [AuthController::class, 'logout'])->name('logout');
 
     // Pages
     Route::get('/dashboard', [DashboardController::class,  'index'])->name('dashboard');

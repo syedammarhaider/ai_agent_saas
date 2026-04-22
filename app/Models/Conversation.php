@@ -2,23 +2,32 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Conversation extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
-        'user_id', 'client_id', 'title', 'platform',
-        'external_id', 'status', 'metadata',
+        'client_id',
+        'platform',
+        'status',
+        'title',
+        'external_id',
+        'metadata',
     ];
 
-    public function client(): BelongsTo
+    protected $casts = [
+        'metadata' => 'array',
+    ];
+
+    public function client()
     {
         return $this->belongsTo(Client::class);
     }
 
-    public function messages(): HasMany
+    public function messages()
     {
         return $this->hasMany(Message::class);
     }

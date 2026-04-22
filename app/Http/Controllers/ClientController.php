@@ -31,9 +31,9 @@ class ClientController extends Controller
 
         if ($s = $request->search) {
             $q->where(fn($x) =>
-                $x->where('name',    'like', "%$s%")
-                  ->orWhere('email',   'like', "%$s%")
-                  ->orWhere('phone',   'like', "%$s%")
+                $x->where('name',  'like', "%$s%")
+                  ->orWhere('email', 'like', "%$s%")
+                  ->orWhere('phone', 'like', "%$s%")
             );
         }
 
@@ -41,28 +41,32 @@ class ClientController extends Controller
             $q->whereRaw('LOWER(channel) = ?', [strtolower($p)]);
         }
 
-        // Exclude API channel from display
-        $q->whereNotIn('channel', ['api']);
+        // Show ALL clients - do NOT exclude any channel
+        // Previously 'api' was excluded, causing many clients to be hidden.
 
-        $clients = $q->latest()->get()->map(function($c) {
-            $lastMessage = $c->conversations
-                ->flatMap->messages
-                ->sortByDesc('created_at')
-                ->first();
+        $clients = $q->latest()->get()->map(function ($c) {
+            // Handle case where conversations might be deleted
+            $lastMessage = null;
+            if ($c->conversations && $c->conversations->isNotEmpty()) {
+                $lastMessage = $c->conversations
+                    ->flatMap->messages
+                    ->sortByDesc('created_at')
+                    ->first();
+            }
 
             return [
-                'id'             => $c->id,
-                'name'           => $c->name,
-                'email'          => $c->email,
-                'phone'          => $c->phone,
-                'status'         => $c->status,
-                'channel'        => strtolower($c->channel),
-                'platforms'      => [strtolower($c->channel)],
-                'project_details'=> $c->project_details,
-                'last_message'   => $lastMessage?->content,
-                'last_contacted' => $c->last_contacted_at,
-                'created_at'     => $c->created_at,
-                'conversation_count' => $c->conversations->count(),
+                'id'              => $c->id,
+                'name'            => $c->name,
+                'email'           => $c->email,
+                'phone'           => $c->phone,
+                'status'          => $c->status,
+                'channel'         => strtolower($c->channel),
+                'platforms'       => [strtolower($c->channel)],
+                'project_details' => $c->project_details,
+                'last_message'    => $lastMessage?->content,
+                'last_contacted'   => $c->last_contacted_at,
+                'created_at'       => $c->created_at,
+                'conversation_count' => $c->conversations?->count() ?? 0,
             ];
         });
 
@@ -73,11 +77,10 @@ class ClientController extends Controller
     public function stats()
     {
         return response()->json([
-            'total'  => Client::whereNotIn('channel', ['api'])->count(),
-            'active' => Client::where('status', 'in_progress')->whereNotIn('channel', ['api'])->count(),
+            'total'  => Client::count(),  // Count ALL clients
+            'active' => Client::where('status', 'in_progress')->count(),
             'wa'     => Client::whereRaw('LOWER(channel) = ?', ['whatsapp'])->count(),
-            'plats'  => Client::whereNotIn('channel', ['api'])
-                ->selectRaw('LOWER(channel) as c')
+            'plats'  => Client::selectRaw('LOWER(channel) as c')
                 ->distinct()
                 ->pluck('c')
                 ->filter()
@@ -89,10 +92,10 @@ class ClientController extends Controller
     public function store(Request $request)
     {
         $data = $request->validate([
-            'name'    => 'required|string|max:255',
-            'email'   => 'required|email|unique:clients,email',
-            'phone'   => 'nullable|string|max:30',
-            'channel' => 'required|in:whatsapp,slack',
+            'name'            => 'required|string|max:255',
+            'email'           => 'required|email|unique:clients,email',
+            'phone'           => 'nullable|string|max:30',
+            'channel'         => 'required|in:whatsapp,slack,api,web',
             'project_details' => 'nullable|string',
         ]);
 
@@ -101,6 +104,16 @@ class ClientController extends Controller
             'status'  => 'in_progress',
             'channel' => strtolower($data['channel']),
         ]);
+
+        // Send welcome email immediately after client creation
+        if ($client->email) {
+            try {
+                $this->emailService->sendWelcomeEmail($client);
+                Log::info("Welcome email sent to {$client->email} after creation.");
+            } catch (\Exception $e) {
+                Log::error("Failed to send welcome email on client creation: " . $e->getMessage());
+            }
+        }
 
         return response()->json($client, 201);
     }
