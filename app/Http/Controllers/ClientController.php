@@ -91,31 +91,59 @@ class ClientController extends Controller
     /** POST /api/clients */
     public function store(Request $request)
     {
-        $data = $request->validate([
-            'name'            => 'required|string|max:255',
-            'email'           => 'required|email|unique:clients,email',
-            'phone'           => 'nullable|string|max:30',
-            'channel'         => 'required|in:whatsapp,slack,api,web',
-            'project_details' => 'nullable|string',
-        ]);
+        try {
+            Log::info("Client creation attempt: " . json_encode($request->all()));
+            
+            $data = $request->validate([
+                'name'            => 'required|string|max:255',
+                'email'           => 'required|email|unique:clients,email',
+                'phone'           => 'nullable|string|max:30',
+                'channel'         => 'required|in:whatsapp,slack,api,web',
+                'project_details' => 'nullable|string',
+            ], [
+                'email.unique' => 'A client with this email address already exists.',
+            ]);
 
-        $client = Client::create($data + [
-            'user_id' => Auth::id(),
-            'status'  => 'in_progress',
-            'channel' => strtolower($data['channel']),
-        ]);
+            Log::info("Validation passed for client creation");
 
-        // Send welcome email immediately after client creation
-        if ($client->email) {
-            try {
-                $this->emailService->sendWelcomeEmail($client);
-                Log::info("Welcome email sent to {$client->email} after creation.");
-            } catch (\Exception $e) {
-                Log::error("Failed to send welcome email on client creation: " . $e->getMessage());
+            $client = Client::create($data + [
+                'user_id' => Auth::id(),
+                'status'  => 'in_progress',
+                'channel' => strtolower($data['channel']),
+            ]);
+
+            Log::info("Client created successfully: ID {$client->id}");
+
+            // Send welcome email immediately after client creation
+            if ($client->email) {
+                try {
+                    $this->emailService->sendWelcomeEmail($client);
+                    Log::info("Welcome email sent to {$client->email} after creation.");
+                } catch (\Exception $e) {
+                    Log::error("Failed to send welcome email on client creation: " . $e->getMessage());
+                }
             }
-        }
 
-        return response()->json($client, 201);
+            return response()->json([
+                'success' => true,
+                'client' => $client,
+                'message' => 'Client created successfully'
+            ], 201);
+
+        } catch (\Illuminate\Validation\ValidationException $e) {
+            Log::error("Client validation failed: " . json_encode($e->errors()));
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $e->errors()
+            ], 422);
+        } catch (\Exception $e) {
+            Log::error("Client creation failed: " . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create client: ' . $e->getMessage()
+            ], 500);
+        }
     }
 
     /** PUT /api/clients/{id} */

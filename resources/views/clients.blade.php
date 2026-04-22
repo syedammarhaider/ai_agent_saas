@@ -400,20 +400,55 @@ async function saveClient() {
     const phone   = document.getElementById('mPhone').value.trim();
     const channel = document.getElementById('mChannel').value;
     const project = document.getElementById('mProject').value.trim();
+    
+    // Client-side validation
     if (!name)  { showToast('Name is required', 'error');  return; }
     if (!email) { showToast('Email is required', 'error'); return; }
+    if (!channel) { showToast('Channel is required', 'error'); return; }
+    
+    // Check if client already exists (client-side check)
+    const existingClient = allClients.find(c => c.email === email);
+    if (existingClient) {
+        showToast(`Client with email ${email} already exists (Name: ${existingClient.name}). Use a different email or update the existing client.`, 'error');
+        return;
+    }
+    
+    // Disable button to prevent double submission
+    const saveBtn = document.querySelector('button[onclick="saveClient()"]');
+    const originalText = saveBtn.innerHTML;
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg> Saving...';
+    
     try {
         const res = await fetch('/api/clients', {
             method:'POST', headers:{'Content-Type':'application/json','X-CSRF-TOKEN':CSRF},
             body:JSON.stringify({name, email, phone, channel, project_details:project})
         });
-        if (res.ok) {
+        
+        const data = await res.json();
+        
+        if (res.ok && data.success) {
             closeAddModal();
             ['mName','mEmail','mPhone','mProject'].forEach(id => { document.getElementById(id).value = ''; });
             document.getElementById('mChannel').value = 'whatsapp';
-            showToast('Client added!', 'success'); load();
-        } else { showToast('Failed to save. Check inputs.', 'error'); }
-    } catch(e) { showToast('Error: ' + e.message, 'error'); }
+            showToast('Client added successfully!', 'success'); 
+            load();
+        } else {
+            // Handle specific validation errors
+            if (data.errors) {
+                const firstError = Object.values(data.errors)[0][0];
+                showToast(firstError || 'Validation failed', 'error');
+            } else {
+                showToast(data.message || 'Failed to save client', 'error');
+            }
+        }
+    } catch(e) { 
+        showToast('Network error: ' + e.message, 'error'); 
+    } finally {
+        // Re-enable button
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = originalText;
+    }
 }
 window.saveClient = saveClient;
 
