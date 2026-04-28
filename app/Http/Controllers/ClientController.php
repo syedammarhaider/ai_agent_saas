@@ -44,6 +44,13 @@ class ClientController extends Controller
         // Show ALL clients - do NOT exclude any channel
         // Previously 'api' was excluded, causing many clients to be hidden.
 
+        // Filter out Slack ID entries and @slack.local emails at database level
+        $q->where(function($query) {
+            $query->where('name', 'NOT REGEXP', '^U[A-Z0-9]+$')
+                  ->where('email', 'NOT LIKE', '%@slack.local')
+                  ->where('name', 'NOT LIKE', 'U%');  // Additional filter for any name starting with U
+        });
+        
         $clients = $q->latest()->get()->map(function ($c) {
             // Handle case where conversations might be deleted
             $lastMessage = null;
@@ -76,11 +83,17 @@ class ClientController extends Controller
     /** GET /api/clients/stats */
     public function stats()
     {
+        // Filter out Slack ID entries and @slack.local emails
+        $baseQuery = Client::where(function($q) {
+            $q->where('name', 'NOT REGEXP', '^U[A-Z0-9]+$')
+              ->where('email', 'NOT LIKE', '%@slack.local');
+        });
+        
         return response()->json([
-            'total'  => Client::count(),  // Count ALL clients
-            'active' => Client::where('status', 'in_progress')->count(),
-            'wa'     => Client::whereRaw('LOWER(channel) = ?', ['whatsapp'])->count(),
-            'plats'  => Client::selectRaw('LOWER(channel) as c')
+            'total'  => $baseQuery->count(),
+            'active' => $baseQuery->where('status', 'in_progress')->count(),
+            'wa'     => $baseQuery->whereRaw('LOWER(channel) = ?', ['whatsapp'])->count(),
+            'plats'  => $baseQuery->selectRaw('LOWER(channel) as c')
                 ->distinct()
                 ->pluck('c')
                 ->filter()

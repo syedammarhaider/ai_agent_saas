@@ -25,7 +25,7 @@
                     </svg>
                 </div>
                 <div>
-                    <div class="sb-logo-text">NexusAI</div>
+                    <div class="sb-logo-text">DS AI</div>
                     <div class="sb-logo-sub">Agent Platform</div>
                 </div>
             </div>
@@ -50,7 +50,7 @@
                             <circle cx="12" cy="8" r="4"/>
                             <path stroke-linecap="round" d="M4 20c0-4 3.582-7 8-7s8 3 8 7"/>
                         </svg>
-                        AI Agent
+                        Testing with AI
                     </a>
                     <a href="{{ route('clients') }}" class="nav-link {{ request()->routeIs('clients') ? 'active' : '' }}">
                         <svg class="nl-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
@@ -98,7 +98,7 @@
                     <path stroke-linecap="round" d="M4 6h16M4 12h16M4 18h16"/>
                 </svg>
             </button>
-            <span class="mob-title">NexusAI</span>
+            <span class="mob-title">DS AI</span>
         </div>
 
         <main class="main-content">
